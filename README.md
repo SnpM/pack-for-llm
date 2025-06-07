@@ -43,6 +43,11 @@ This extension contributes the following settings (accessible via `Ctrl+Shift+P`
   _Default_: `<<< FILE: ${file} >>>`  
   Template for the delimiter inserted before each file.
 
+- **packForLLM.endDelimiter**  
+  _Type_: `string`  
+  _Default_: `<<< EOF >>>`  
+  Template for the delimiter inserted after each file’s content.
+
 - **packForLLM.useGitignore**  
   _Type_: `boolean`  
   _Default_: `true`  
@@ -55,8 +60,8 @@ This extension contributes the following settings (accessible via `Ctrl+Shift+P`
 
 - **packForLLM.ignoreHidden**  
   _Type_: `boolean`  
-  _Default_: `false`  
-  Whether to skip dot-prefixed files/folders.
+   _Default_: `true`  
+  Whether to skip files and folders whose name begins with a dot (e.g. `.env`, `.vscode/`).
 
 ---
 
