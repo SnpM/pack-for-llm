@@ -98,7 +98,7 @@
         },
         "packForLLM.ignoreHidden": {
           "type": "boolean",
-          "default": false,
+          "default": true,
           "description": "Whether to skip files and folders whose name begins with a dot (e.g. `.env`, `.vscode/`)."
         }
       }
