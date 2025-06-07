@@ -1,8 +1,8 @@
 {
   "name": "pack-for-llm",
-  "displayName": "PackForLLM (P4L)",
+  "displayName": "Pack for LLM",
   "description": "Packs text files in your project into a single copy-pasteable files for your LLM context.",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "engines": {
     "vscode": "^1.100.0"
   },
