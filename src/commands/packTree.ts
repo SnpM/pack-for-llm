@@ -9,7 +9,6 @@ import {
   shouldIgnore,
   isDirectory
 } from '../utils';
-import ignore from 'ignore';  // only used for fallback if no .gitignore, but loadIgnore already handles .git
 
 export function registerPackTreeCommand(
   context: vscode.ExtensionContext,
@@ -75,14 +74,10 @@ export function registerPackTreeCommand(
     const ignoreHidden = config.get<boolean>('ignoreHidden', false);
     outputChannel.appendLine(`Ignore hidden files? ${ignoreHidden}`);
 
-    // — 4. Load .gitignore (if requested) —
-    let ig: ignore.Ignore;
-    if (useGitignore) {
-      ig = await loadIgnore(workspaceRootFsPath);
-    } else {
-      ig = await loadIgnore(workspaceRootFsPath);
-      // loadIgnore always ignores .git/ anyway
-      outputChannel.appendLine('Skipping .gitignore file rules (still ignoring .git).');
+    // — 4. Load .gitignore matcher —
+    const igMatcher = await loadIgnore(workspaceRootFsPath);
+    if (!useGitignore) {
+      outputChannel.appendLine('Skipping .gitignore rules (still ignoring .git).');
     }
 
     // — 5. Build directory tree string in “tree” format —
@@ -100,44 +95,37 @@ export function registerPackTreeCommand(
       prefix: string,
       isLast: boolean
     ): Promise<void> {
-      const baseName = path.basename(uri.fsPath);
-
       const relToWorkspace = path
         .relative(workspaceRootFsPath, uri.fsPath)
         .replace(/\\/g, '/');
-      if (shouldIgnore(relToWorkspace, ig, ignoreExtensions, ignoreHidden)) {
+
+      if (shouldIgnore(relToWorkspace, igMatcher, ignoreExtensions, ignoreHidden)) {
         outputChannel.appendLine(`Ignored: ${relToWorkspace}`);
         return;
       }
 
       const connector = isLast ? '└── ' : '├── ';
-      const name = baseName + (await isDirectory(uri) ? '/' : '');
+      const name = path.basename(uri.fsPath) + (await isDirectory(uri) ? '/' : '');
       lines.push(prefix + connector + name);
 
       if (await isDirectory(uri)) {
         let entries = await vscode.workspace.fs.readDirectory(uri);
 
-        // Filter out any ignored by .gitignore, by extension, or hidden (if requested)
-        const filtered: [string, vscode.FileType][] = [];
-        for (const [entryName, fileType] of entries) {
+        // Filter out any ignored by gitignore, extension, or hidden
+        entries = entries.filter(([entryName, fileType]) => {
           const childRel = path
             .relative(workspaceRootFsPath, path.join(uri.fsPath, entryName))
             .replace(/\\/g, '/');
-
-          if (shouldIgnore(childRel, ig, ignoreExtensions, ignoreHidden)) {
-            outputChannel.appendLine(`  Skipping: ${childRel}`);
-            continue;
-          }
-          filtered.push([entryName, fileType]);
-        }
+          return !shouldIgnore(childRel, igMatcher, ignoreExtensions, ignoreHidden);
+        });
 
         // Sort alphabetically
-        filtered.sort((a, b) => a[0].localeCompare(b[0]));
+        entries.sort((a, b) => a[0].localeCompare(b[0]));
 
-        for (let i = 0; i < filtered.length; i++) {
-          const [entryName] = filtered[i];
+        for (let i = 0; i < entries.length; i++) {
+          const [entryName] = entries[i];
           const childUri = vscode.Uri.joinPath(uri, entryName);
-          const isLastChild = i === filtered.length - 1;
+          const isLastChild = i === entries.length - 1;
           const newPrefix = prefix + (isLast ? '    ' : '│   ');
           await buildTree(childUri, newPrefix, isLastChild);
         }
@@ -146,11 +134,11 @@ export function registerPackTreeCommand(
 
     // Gather top‐level entries under root
     let topEntries = await vscode.workspace.fs.readDirectory(rootUri);
-    topEntries = topEntries.filter(([entryName, fileType]) => {
+    topEntries = topEntries.filter(([entryName]) => {
       const childRel = path
         .relative(workspaceRootFsPath, path.join(rootUri.fsPath, entryName))
         .replace(/\\/g, '/');
-      return !shouldIgnore(childRel, ig, ignoreExtensions, ignoreHidden);
+      return !shouldIgnore(childRel, igMatcher, ignoreExtensions, ignoreHidden);
     });
     topEntries.sort((a, b) => a[0].localeCompare(b[0]));
 
@@ -166,7 +154,7 @@ export function registerPackTreeCommand(
     // — 6. Show the result in a new untitled document —
     outputChannel.appendLine('Opening directory tree document.');
     const doc = await vscode.workspace.openTextDocument({
-      language: 'plaintext',
+      language: 'pack4llm',
       content: treeText
     });
     await vscode.window.showTextDocument(doc);

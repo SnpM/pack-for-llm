@@ -1,0 +1,3 @@
+{
+    "packForLLM.delimiter": "----- ${file} -----"
+}

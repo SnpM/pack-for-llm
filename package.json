@@ -6,6 +6,10 @@
   "engines": {
     "vscode": "^1.100.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/snpm/pack-for-llm.git"
+  },
   "categories": [
     "Other"
   ],
@@ -16,6 +20,19 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "pack4llm",
+        "aliases": [
+          "pack4llm",
+          "p4l"
+        ],
+        "extensions": [
+          ".p4l"
+        ],
+        "configuration": "./p4l-language.json"
+      }
+    ],
     "commands": [
       {
         "command": "extension.packForLLM.pack",
@@ -63,6 +80,11 @@
           "type": "string",
           "default": "<<< FILE: ${file} >>>",
           "description": "Template for the delimiter inserted before each file. Use `${file}` as a placeholder for the file’s relative path."
+        },
+        "packForLLM.endDelimiter": {
+          "type": "string",
+          "default": "<<< EOF >>>",
+          "description": "Template for the delimiter inserted after each file’s content. Use `${file}` as a placeholder for the file’s relative path."
         },
         "packForLLM.useGitignore": {
           "type": "boolean",

@@ -2,7 +2,7 @@
 
 import * as vscode from 'vscode';
 import * as path from 'path';
-import ignore from 'ignore';
+import ignore, { Ignore } from 'ignore';
 import * as fs from 'fs';
 
 /**
@@ -18,7 +18,7 @@ export function getWorkspaceRootFsPath(uri: vscode.Uri): string {
  * Load a GitIgnore matcher for the workspace root.
  * Always ignores “.git/” regardless of .gitignore contents.
  */
-export async function loadIgnore(workspaceRoot: string): Promise<ignore.Ignore> {
+export async function loadIgnore(workspaceRoot: string): Promise<Ignore> {
   const ig = ignore();
   const gitignorePathOnDisk = path.join(workspaceRoot, '.gitignore');
 
@@ -59,7 +59,7 @@ export function parseIgnoreExtensions(raw: string): string[] {
  */
 export function shouldIgnore(
   relPath: string,
-  ig: ignore.Ignore,
+  ig: Ignore,
   ignoreExtensions: string[],
   ignoreHidden: boolean
 ): boolean {
@@ -92,7 +92,7 @@ export function shouldIgnore(
 export async function gatherFileUris(
   uri: vscode.Uri,
   workspaceRoot: string,
-  ig: ignore.Ignore,
+  ig: Ignore,
   ignoreExtensions: string[],
   ignoreHidden: boolean,
   outputChannel: vscode.OutputChannel

@@ -9,6 +9,9 @@ import {
   gatherFileUris
 } from '../utils';
 
+const DEFAULT_DELIMITER = '<<< FILE: ${file} >>>';
+const DEFAULT_END_DELIMITER = '<<< EOF >>>';
+
 export function registerPackCommand(
   context: vscode.ExtensionContext,
   outputChannel: vscode.OutputChannel
@@ -26,7 +29,6 @@ export function registerPackCommand(
       uris = [resource];
       outputChannel.appendLine('Single resource selected.');
     } else {
-      // Command Palette fallback: prompt for MULTI folder/file selection
       const picks = await vscode.window.showOpenDialog({
         canSelectFiles: true,
         canSelectFolders: true,
@@ -49,7 +51,11 @@ export function registerPackCommand(
     const config = vscode.workspace.getConfiguration('packForLLM');
     const rawDelimiterTemplate =
       config.get<string>('delimiter') || '<<< FILE: ${file} >>>';
-    outputChannel.appendLine(`Using delimiter template: "${rawDelimiterTemplate}"`);
+    const rawEndDelimiterTemplate =
+      config.get<string>('endDelimiter') || '<<< EOF >>>';
+
+    outputChannel.appendLine(`Using start‐delimiter: "${rawDelimiterTemplate}"`);
+    outputChannel.appendLine(`Using end‐delimiter:   "${rawEndDelimiterTemplate}"`);
 
     const useGitignore = config.get<boolean>('useGitignore', true);
     outputChannel.appendLine(`Use .gitignore? ${useGitignore}`);
@@ -67,16 +73,14 @@ export function registerPackCommand(
     outputChannel.appendLine(`Ignore hidden files? ${ignoreHidden}`);
 
     // — 4. Load .gitignore matcher —
-    let igMatcher;
-    if (useGitignore) {
-      igMatcher = await loadIgnore(workspaceRootFsPath);
-    } else {
-      igMatcher = await loadIgnore(workspaceRootFsPath);
-      // Even if user disabled .gitignore, loadIgnore always adds ".git/" so that .git is ignored.
+    const igMatcher = useGitignore
+      ? await loadIgnore(workspaceRootFsPath)
+      : await loadIgnore(workspaceRootFsPath); // still ignores .git/
+    if (!useGitignore) {
       outputChannel.appendLine('Skipping .gitignore file rules (still ignoring .git folder).');
     }
 
-    // — 5+6. Gather & read files under a progress notification —
+    // — 5+6. Gather & read files under progress —
     let aggregated = '';
     try {
       aggregated = await vscode.window.withProgress(
@@ -88,7 +92,7 @@ export function registerPackCommand(
         async progress => {
           progress.report({ message: 'Gathering files…' });
 
-          // 5a. Collect all file URIs from each selection
+          // 5a. Collect all file URIs
           const allFileUris: vscode.Uri[] = [];
           for (const uri of uris) {
             outputChannel.appendLine(`Processing selection: ${uri.fsPath}`);
@@ -122,8 +126,12 @@ export function registerPackCommand(
             const bytes = await vscode.workspace.fs.readFile(fileUri);
             const content = bytes.toString();
 
-            const actualDelimiter = rawDelimiterTemplate.replace(/\$\{file\}/g, relPath);
-            result += actualDelimiter + '\n' + content + '\n\n';
+            const startDelim = rawDelimiterTemplate.replace(/\$\{file\}/g, relPath);
+            const endDelim   = rawEndDelimiterTemplate.replace(/\$\{file\}/g, relPath);
+
+            result += startDelim + '\n';
+            result += content + '\n';
+            result += endDelim + '\n\n';
 
             progress.report({
               increment: Math.floor(100 / allFileUris.length),
@@ -145,11 +153,27 @@ export function registerPackCommand(
     }
 
     // — 7. Open the aggregated document —
-    outputChannel.appendLine('Opening aggregated document.');
-    const doc = await vscode.workspace.openTextDocument({
-      language: 'plaintext',
-      content: aggregated
-    });
+    // Check if custom delimiters were used
+    const hasCustomDelimiters =
+      rawDelimiterTemplate !== DEFAULT_DELIMITER ||
+      rawEndDelimiterTemplate !== DEFAULT_END_DELIMITER;
+
+    let doc = null;
+    if (!hasCustomDelimiters) {
+      outputChannel.appendLine('Opening aggregated document in "pack4llm" language.');
+      doc = await vscode.workspace.openTextDocument({
+        language: 'pack4llm',
+        content: aggregated
+      });
+    }
+    else {
+      // Fallback to plaintext if custom delimiters are used
+      outputChannel.appendLine('Custom delimiters used. Opening aggregated document in "plaintext" language.');
+      doc = await vscode.workspace.openTextDocument({
+        language: 'plaintext',
+        content: aggregated
+      });
+    }
     await vscode.window.showTextDocument(doc);
     outputChannel.appendLine('Aggregated document displayed.');
     outputChannel.show();
