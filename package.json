@@ -1,6 +1,7 @@
 {
   "name": "pack-for-llm",
   "displayName": "Pack for LLM",
+  "publisher": "nibs",
   "description": "Packs text files in your project into a single copy-pasteable files for your LLM context.",
   "version": "0.1.0",
   "engines": {
