@@ -6,7 +6,8 @@ import {
   getWorkspaceRootFsPath,
   loadIgnore,
   parseIgnoreExtensions,
-  gatherFileUris
+  gatherFileUris,
+  createUniqueUntitledUri
 } from '../utils';
 
 const DEFAULT_DELIMITER = '<<< FILE: ${file} >>>';
@@ -64,8 +65,7 @@ export function registerPackCommand(
       config.get<string>('ignoreExtensions', '') || ''
     );
     outputChannel.appendLine(
-      `Ignoring extensions: ${
-        ignoreExtensions.length > 0 ? ignoreExtensions.join(', ') : '(none)'
+      `Ignoring extensions: ${ignoreExtensions.length > 0 ? ignoreExtensions.join(', ') : '(none)'
       }`
     );
 
@@ -127,7 +127,7 @@ export function registerPackCommand(
             const content = bytes.toString();
 
             const startDelim = rawDelimiterTemplate.replace(/\$\{file\}/g, relPath);
-            const endDelim   = rawEndDelimiterTemplate.replace(/\$\{file\}/g, relPath);
+            const endDelim = rawEndDelimiterTemplate.replace(/\$\{file\}/g, relPath);
 
             result += startDelim + '\n';
             result += content + '\n';
@@ -152,31 +152,30 @@ export function registerPackCommand(
       return;
     }
 
-    // — 7. Open the aggregated document —
-    // Check if custom delimiters were used
+    // — 7. Open the aggregated document with a name and correct language —
     const hasCustomDelimiters =
       rawDelimiterTemplate !== DEFAULT_DELIMITER ||
       rawEndDelimiterTemplate !== DEFAULT_END_DELIMITER;
 
-    let doc = null;
-    if (!hasCustomDelimiters) {
-      outputChannel.appendLine('Opening aggregated document in "pack4llm" language.');
-      doc = await vscode.workspace.openTextDocument({
-        language: 'pack4llm',
-        content: aggregated
-      });
-    }
-    else {
-      // Fallback to plaintext if custom delimiters are used
-      outputChannel.appendLine('Custom delimiters used. Opening aggregated document in "plaintext" language.');
-      doc = await vscode.workspace.openTextDocument({
-        language: 'plaintext',
-        content: aggregated
-      });
-    }
-    await vscode.window.showTextDocument(doc);
-    outputChannel.appendLine('Aggregated document displayed.');
+    // pick filename base and extension
+    const baseName = 'packed';
+    const ext      = 'p4l' // hasCustomDelimiters ? 'txt' : 'p4l';
+    const langId   = hasCustomDelimiters ? 'plaintext' : 'pack4llm';
+
+    // use helper to avoid collisions
+    const untitledUri = createUniqueUntitledUri(
+      workspaceRootFsPath, baseName, ext);
+
+    // open, set language, show, and insert content
+    const doc = await vscode.workspace.openTextDocument(untitledUri);
+    await vscode.languages.setTextDocumentLanguage(doc, langId);
+    const editor = await vscode.window.showTextDocument(doc);
+    await editor.edit(edit => edit.insert(new vscode.Position(0, 0), aggregated));
+
+    outputChannel.appendLine(`Aggregated document displayed as ${path.basename(untitledUri.path)}.`);
     outputChannel.show();
+
+
   };
 
   context.subscriptions.push(

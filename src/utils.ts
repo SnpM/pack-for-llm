@@ -81,6 +81,13 @@ export function shouldIgnore(
       return true;
     }
   }
+
+  // 4) Hardcoded exclusions
+  const hardcodedExclusions = [".p4l"]
+  if (relPath.endsWith('.p4l')) {
+    return true;
+  }
+
   return false;
 }
 
@@ -160,4 +167,43 @@ export async function gatherFileUris(
 export async function isDirectory(uri: vscode.Uri): Promise<boolean> {
   const stat = await vscode.workspace.fs.stat(uri);
   return Boolean(stat.type & vscode.FileType.Directory);
+}
+
+/**
+   * Create an untitled URI for a new file named baseName.ext,
+   * appending _1, _2, … if a same-named untitled document is already open.
+   */
+export function createUniqueUntitledUri(
+  workspaceRoot: string,
+  baseName: string,
+  ext: string
+): vscode.Uri {
+  // 1) Gather all open untitled tab names
+  const openUntitled = new Set(
+    vscode.workspace.textDocuments
+      .filter((doc) => doc.uri.scheme === 'untitled')
+      .map((doc) => path.basename(doc.uri.path))
+  );
+
+  // 2) Gather all file names in workspace root
+  let onDisk = new Set<string>();
+  try {
+    for (const f of fs.readdirSync(workspaceRoot)) {
+      onDisk.add(f);
+    }
+  } catch {
+    // ignore read errors
+  }
+
+  let name = `${baseName}.${ext}`;
+  let counter = 1;
+
+  // bump suffix while name collides with either set
+  while (openUntitled.has(name) || onDisk.has(name)) {
+    name = `${baseName}_${counter}.${ext}`;
+    counter++;
+  }
+
+  const fullPath = path.join(workspaceRoot, name);
+  return vscode.Uri.parse(`untitled:${fullPath}`);
 }
