@@ -1,9 +1,10 @@
 {
   "name": "pack-for-llm",
   "displayName": "Pack for LLM",
+  "icon": "images/pack_for_llm_128x128.png",
   "publisher": "nibs",
   "description": "Packs text files in your project into a single copy-pasteable files for your LLM context.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "engines": {
     "vscode": "^1.100.0"
   },
